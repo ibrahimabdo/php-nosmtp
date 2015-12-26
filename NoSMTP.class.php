@@ -173,7 +173,7 @@ class NoSMTP {
 	}
 
 	private function writeToSocket($socket, $data) {
-		socket_send($socket, $data, strlen($data), MSG_EOF);
+		socket_write($socket, $data, strlen($data));
 
 		if ($this->settings['verbose'] >= 2) {
 			$this->logMessage('SENT: '.$data);
@@ -183,16 +183,15 @@ class NoSMTP {
 	private function getSocketData($socket) {
 		$data = '';
 
-		$null = array();
+		$null = null;
 		do {
-
-			$read = array($socket);
-			$received = socket_select($read, $null, $null, $null);
-
-			if ($received) {
-				$data .= socket_read($read[0], 1024);
+			$r = array($socket);
+			$received = socket_select($r, $null, $null, 0, 0);
+			
+			if (count($r)) {
+				$data .= socket_read($r[0], 1024);
 			}
-		} while ($data == '' || $received);
+		} while ($data == '' || count($r));
 
 		if ($this->settings['verbose'] >= 2) {
 			$this->logMessage('RECV: '.$data);
