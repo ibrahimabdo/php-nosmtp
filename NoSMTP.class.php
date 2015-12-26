@@ -111,7 +111,7 @@ class NoSMTP {
 		if (count($explode) == 2) {
 			return $explode[1];
 		} else {
-			return $this->throwError('Invalid TO address <'.$address.'>');
+			return $this->throwError('Invalid address <'.$address.'>');
 		}
 	}
 
@@ -220,7 +220,7 @@ class NoSMTP {
 				/* ---------------------------------------------------------------------------------------------------------- */
 				// Send Hello command
 
-				$this->writeToSocket($socket, "HELO ".$this->getDomain($this->getHeader('From'))."\r\n");
+				$this->writeToSocket($socket, "HELO ".(!empty($this->getDomain($this->getHeader('From'))) ? $this->getDomain($this->getHeader('From')) : '127.0.0.1')."\r\n");
 				$recv = $this->getSocketData($socket);
 				if ($this->parseResponse($recv)->code[0] != '2') return $this->throwError('Server Throwed Exception: '.$recv);
 				
