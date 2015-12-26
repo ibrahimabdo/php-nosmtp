@@ -40,6 +40,11 @@ $mail = new NoSMTP(array(
 $mail->send();
 ```
 
+### Adding an attachment:
+```
+$mail->addFile('/path/to/file');
+```
+
 ### Settings:
 ```
 'verbose' 		=> 0, 				// 0 - no logging / 1 - log only errors / 2 - log every sent & received message from server
@@ -50,11 +55,6 @@ $mail->send();
 Changing a setting:
 ```
 $mail->settings['verbose'] = 1;
-```
-
-### Adding an attachment:
-```
-$mail->addFile('/path/to/file');
 ```
 
 # Future TODOs:
