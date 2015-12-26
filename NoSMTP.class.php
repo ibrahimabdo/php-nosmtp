@@ -6,7 +6,7 @@ class NoSMTP {
 		'throw_errors' 	=> false 			// true to throw catchable errors
 	);
 
-	private static $version = '1.0';
+	private static $version = '1.0.1';
 	
 	private $to = array();
 	private $subject = '';
@@ -31,26 +31,26 @@ class NoSMTP {
 				} else if (is_string($options['to'])) {
 					$this->to = array($options['to']);
 				} else {
-					$this->throwError('Invalid TO parameter, should be array, object or string');
+					return $this->throwError('Invalid TO parameter, should be array, object or string');
 				}
 			}
 
 			if (isset($options['subject']) && is_string($options['subject'])) {
 				$this->subject = $options['subject'];
 			} else {
-				$this->throwError('Invalid SUBJECT parameter, should be string');
+				return $this->throwError('Invalid SUBJECT parameter, should be string');
 			}
 
 			if (isset($options['message']) && is_string($options['message'])) {
 				$this->message = $options['message'];
 			} else {
-				$this->throwError('Invalid MESSAGE parameter, should be string');
+				return $this->throwError('Invalid MESSAGE parameter, should be string');
 			}
 
 			if (isset($options['headers']) && is_array($options['headers'])) {
 				$this->headers = $options['headers'];
 			} else {
-				$this->throwError('Invalid HEADERS parameter, should be array');
+				return $this->throwError('Invalid HEADERS parameter, should be array');
 			}
 
 		} else if (is_string($options)) {
@@ -59,19 +59,19 @@ class NoSMTP {
 			if (is_string($subject)) {
 				$this->subject = $subject;
 			} else {
-				$this->throwError('Invalid SUBJECT parameter, should be string');
+				return $this->throwError('Invalid SUBJECT parameter, should be string');
 			}
 
 			if (is_string($message)) {
 				$this->message = $message;
 			} else {
-				$this->throwError('Invalid MESSAGE parameter, should be string');
+				return $this->throwError('Invalid MESSAGE parameter, should be string');
 			}
 
 			if (is_array($headers)) {
 				$this->headers = $headers;
 			} else {
-				$this->throwError('Invalid HEADERS parameter, should be array');
+				return $this->throwError('Invalid HEADERS parameter, should be array');
 			}
 		}
 	}
@@ -111,7 +111,7 @@ class NoSMTP {
 		if (count($explode) == 2) {
 			return $explode[1];
 		} else {
-			$this->throwError('Invalid TO address <'.$address.'>');
+			return $this->throwError('Invalid TO address <'.$address.'>');
 		}
 	}
 
@@ -144,7 +144,7 @@ class NoSMTP {
 
 			return $mx_response;
 		} else {
-			$this->throwError('Could not get MX record for <'.$domain.'>');
+			return $this->throwError('Could not get MX record for <'.$domain.'>');
 		}
 	}
 
@@ -183,11 +183,14 @@ class NoSMTP {
 	private function getSocketData($socket) {
 		$data = '';
 
+		$null = array();
 		do {
-			$received = socket_recv($socket, $buff, 1024, MSG_DONTWAIT);
+
+			$read = array($socket);
+			$received = socket_select($read, $null, $null, $null);
+
 			if ($received) {
-				$data .= $buff;
-				usleep(10000);
+				$data .= socket_read($read[0], 1024);
 			}
 		} while ($data == '' || $received);
 
@@ -213,42 +216,42 @@ class NoSMTP {
 				// Receive welcome message
 
 				$recv = $this->getSocketData($socket);
-				if ($this->parseResponse($recv)->code[0] != '2') $this->throwError('Server Throwed Exception: '.$recv);
-				
+				if ($this->parseResponse($recv)->code[0] != '2') return $this->throwError('Server Throwed Exception: '.$recv);
+
 				/* ---------------------------------------------------------------------------------------------------------- */
 				// Send Hello command
 
-				$this->writeToSocket($socket, "HELO localhost\r\n");
+				$this->writeToSocket($socket, "HELO ".$this->getDomain($this->getHeader('From'))."\r\n");
 				$recv = $this->getSocketData($socket);
-				if ($this->parseResponse($recv)->code[0] != '2') $this->throwError('Server Throwed Exception: '.$recv);
+				if ($this->parseResponse($recv)->code[0] != '2') return $this->throwError('Server Throwed Exception: '.$recv);
 				
 				/* ---------------------------------------------------------------------------------------------------------- */
 				// Tell server the Sender address
 
 				$this->writeToSocket($socket, "MAIL FROM:<".$this->getHeader('From').">\r\n");
 				$recv = $this->getSocketData($socket);
-				if ($this->parseResponse($recv)->code[0] != '2') $this->throwError('Server Throwed Exception: '.$recv);
+				if ($this->parseResponse($recv)->code[0] != '2') return $this->throwError('Server Throwed Exception: '.$recv);
 				
 				/* ---------------------------------------------------------------------------------------------------------- */
 				// Tell server the destination address
 
 				$this->writeToSocket($socket, "RCPT TO:<".$this->getHeader('To').">\r\n");
 				$recv = $this->getSocketData($socket);
-				if ($this->parseResponse($recv)->code[0] != '2') $this->throwError('Server Throwed Exception: '.$recv);
+				if ($this->parseResponse($recv)->code[0] != '2') return $this->throwError('Server Throwed Exception: '.$recv);
 
 				/* ---------------------------------------------------------------------------------------------------------- */
 				// Tell server we are going to send the message next 
 
 				$this->writeToSocket($socket, "DATA\r\n");
 				$recv = $this->getSocketData($socket);
-				if ($this->parseResponse($recv)->code[0] != '3' && $this->parseResponse($recv)->code[0] != '2') $this->throwError('Server Throwed Exception: '.$recv);
+				if ($this->parseResponse($recv)->code[0] != '3' && $this->parseResponse($recv)->code[0] != '2') return $this->throwError('Server Throwed Exception: '.$recv);
 
 				/* ---------------------------------------------------------------------------------------------------------- */
 				// Send the message to server
 
 				$this->writeToSocket($socket, $this->createMessage());
 				$recv = $this->getSocketData($socket);
-				if ($this->parseResponse($recv)->code[0] != '2') $this->throwError('Server Throwed Exception: '.$recv);
+				if ($this->parseResponse($recv)->code[0] != '2') return $this->throwError('Server Throwed Exception: '.$recv);
 
 				/* ---------------------------------------------------------------------------------------------------------- */
 				// If everything is fine, close the connection
@@ -258,7 +261,7 @@ class NoSMTP {
 				if ($this->parseResponse($recv)->code[0] == '2') {
 					$this->terminateSocket($socket);
 				} else {
-					$this->throwError('Server Throwed Exception: '.$recv);
+					return $this->throwError('Server Throwed Exception: '.$recv);
 				}
 
 				break;
@@ -297,6 +300,8 @@ class NoSMTP {
 		if ($this->settings['throw_errors']) {
 			throw new Exception($message);
 		}
+
+		return false;
 	}
 
 	private function createHeaders($headers = array()) {
